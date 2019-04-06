@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -5,7 +6,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Localization;
 using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
-using OrchardCore.Admin;
 using OrchardCore.DisplayManagement;
 using OrchardCore.DisplayManagement.Implementation;
 using OrchardCore.DisplayManagement.Notify;
@@ -13,6 +13,7 @@ using OrchardCore.Email;
 using OrchardCore.Entities;
 using OrchardCore.Modules;
 using OrchardCore.Settings;
+using OrchardCore.Users.Events;
 using OrchardCore.Users.Models;
 using OrchardCore.Users.Services;
 using OrchardCore.Users.ViewModels;
@@ -20,7 +21,6 @@ using OrchardCore.Users.ViewModels;
 namespace OrchardCore.Users.Controllers
 {
     [Feature("OrchardCore.Users.Registration")]
-    [Admin]
     public class RegistrationController : BaseEmailController
     {
         private readonly IUserService _userService;
@@ -28,6 +28,7 @@ namespace OrchardCore.Users.Controllers
         private readonly SignInManager<IUser> _signInManager;
         private readonly IAuthorizationService _authorizationService;
         private readonly ISiteService _siteService;
+        private readonly IEnumerable<IRegistrationFormEvents> _registrationEvents;
 
         private readonly INotifier _notifier;
 
@@ -43,7 +44,8 @@ namespace OrchardCore.Users.Controllers
             IHtmlDisplay displayManager,
             ILogger<RegistrationController> logger,
             IHtmlLocalizer<RegistrationController> htmlLocalizer,
-            IStringLocalizer<RegistrationController> stringLocalizer) : base(smtpService, shapeFactory, displayManager)
+            IStringLocalizer<RegistrationController> stringLocalizer,
+            IEnumerable<IRegistrationFormEvents> registrationEvents) : base(smtpService, shapeFactory, displayManager)
         {
             _userService = userService;
             _userManager = userManager;
@@ -51,6 +53,7 @@ namespace OrchardCore.Users.Controllers
             _authorizationService = authorizationService;
             _siteService = siteService;
             _notifier = notifier;
+            _registrationEvents = registrationEvents;
 
             _logger = logger;
             TH = htmlLocalizer;
@@ -87,6 +90,9 @@ namespace OrchardCore.Users.Controllers
             }
 
             ViewData["ReturnUrl"] = returnUrl;
+
+            await _registrationEvents.InvokeAsync(i => i.RegistrationValidationAsync((key, message) => ModelState.AddModelError(key, message)), _logger);
+
             if (ModelState.IsValid)
             {
                 var user = await _userService.CreateUserAsync(new User { UserName = model.UserName, Email = model.Email, EmailConfirmed = !settings.UsersMustValidateEmail, RoleNames = new string[0] }, model.Password, (key, message) => ModelState.AddModelError(key, message)) as User;
@@ -104,6 +110,8 @@ namespace OrchardCore.Users.Controllers
                         await _signInManager.SignInAsync(user, isPersistent: false);
                     }
                     _logger.LogInformation(3, "User created a new account with password.");
+                    _registrationEvents.Invoke(i => i.RegisteredAsync(), _logger);
+
                     return RedirectToLocal(returnUrl);
                 }
             }
@@ -120,14 +128,22 @@ namespace OrchardCore.Users.Controllers
             {
                 return RedirectToAction(nameof(RegistrationController.Register), "Registration");
             }
+
             var user = await _userManager.FindByIdAsync(userId);
+
             if (user == null)
             {
-                return  NotFound();
+                return NotFound();
             }
+
             var result = await _userManager.ConfirmEmailAsync(user, code);
 
-            return View(result.Succeeded ? "ConfirmEmail" : "Error");
+            if (result.Succeeded)
+            {
+                return View();
+            }
+
+            return NotFound();
         }
 
         [Authorize]
@@ -155,7 +171,7 @@ namespace OrchardCore.Users.Controllers
         {
             var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
             var callbackUrl = Url.Action("ConfirmEmail", "Registration", new { userId = user.Id, code = code }, protocol: HttpContext.Request.Scheme);
-            await SendEmailAsync(user.Email, T["Confirm your account"], new ConfirmEmailViewModel() { User = user, ConfirmEmailUrl = callbackUrl }, "TemplateUserConfirmEmail");
+            await SendEmailAsync(user.Email, T["Confirm your account"], new ConfirmEmailViewModel() { User = user, ConfirmEmailUrl = callbackUrl });
 
             return callbackUrl;
         }

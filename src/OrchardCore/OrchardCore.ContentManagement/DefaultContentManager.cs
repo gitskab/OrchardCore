@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -116,7 +117,7 @@ namespace OrchardCore.ContentManagement
                 contentItems[i] = await LoadAsync(contentItems[i]);
             }
             
-            return contentItems;
+            return contentItems.OrderBy(c => contentItemIds.ToImmutableArray().IndexOf(c.ContentItemId));
         }
 
         public async Task<ContentItem> GetAsync(string contentItemId, VersionOptions options)
@@ -314,8 +315,6 @@ namespace OrchardCore.ContentManagement
 
         protected async Task<ContentItem> BuildNewVersionAsync(ContentItem existingContentItem)
         {
-            var buildingContentItem = await NewAsync(existingContentItem.ContentType);
-
             ContentItem latestVersion;
 
             if (existingContentItem.Latest)
@@ -341,6 +340,11 @@ namespace OrchardCore.ContentManagement
                 latestVersion.Latest = false;
             }
 
+            // We are not invoking NewAsync as we are cloning an existing item
+            // This will also prevent the Elements (parts) from being allocated unnecessarily
+            var buildingContentItem = new ContentItem();
+
+            buildingContentItem.ContentType = existingContentItem.ContentType;
             buildingContentItem.ContentItemId = existingContentItem.ContentItemId;
             buildingContentItem.ContentItemVersionId = _idGenerator.GenerateUniqueId(existingContentItem);
             buildingContentItem.DisplayText = existingContentItem.DisplayText;

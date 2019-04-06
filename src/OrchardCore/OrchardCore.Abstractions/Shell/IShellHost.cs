@@ -8,7 +8,7 @@ namespace OrchardCore.Environment.Shell
     public interface IShellHost
     {
         /// <summary>
-        /// Ensure that all the <see cref="ShellContext"/> are created and available to process requests. 
+        /// Ensure that all the <see cref="ShellContext"/> are pre-created and available to process requests. 
         /// </summary>
         Task InitializeAsync();
 
@@ -59,9 +59,23 @@ namespace OrchardCore.Environment.Shell
         Task<ShellContext> CreateShellContextAsync(ShellSettings settings);
 
         /// <summary>
-        /// Lists all available <see cref="ShellContext"/> instances. 
+        /// Lists all available <see cref="ShellContext"/> instances.
+        /// A shell might have been released or not yet built, if so 'shell.Released' is true and
+        /// 'shell.CreateScope()' return null, but you can still use 'GetScopeAsync(shell.Settings)'.
         /// </summary>
         /// <remarks>A shell might not be listed if it hasn't been created yet, for instance if it has been removed and not yet recreated.</remarks>
-        Task<IEnumerable<ShellContext>> ListShellContextsAsync();
+        IEnumerable<ShellContext> ListShellContexts();
+
+        /// <summary>
+        /// Tries to retrieve the shell settings associated with the specified tenant.
+        /// </summary>
+        /// <returns><c>true</c> if the settings could be found, <c>false</c> otherwise.</returns>
+        bool TryGetSettings(string name, out ShellSettings settings);
+
+        /// <summary>
+        /// Retrieves all shell settings.
+        /// </summary>
+        /// <returns>All shell settings.</returns>
+        IEnumerable<ShellSettings> GetAllSettings();
     }
 }

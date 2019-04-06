@@ -71,13 +71,18 @@ namespace OrchardCore.Contents.Controllers
 
         public ILogger Logger { get; set; }
 
-        public async Task<IActionResult> List(ListContentsViewModel model, PagerParameters pagerParameters)
+        public async Task<IActionResult> List(ListContentsViewModel model, PagerParameters pagerParameters, string typeId = "")
         {
             var siteSettings = await _siteService.GetSiteSettingsAsync();
-            Pager pager = new Pager(pagerParameters, siteSettings.PageSize);
+            var pager = new Pager(pagerParameters, siteSettings.PageSize);
 
             var query = _session.Query<ContentItem, ContentItemIndex>();
 
+            if (!string.IsNullOrEmpty(model.DisplayText))
+            {
+                query = query.With<ContentItemIndex>(x => x.DisplayText.Contains(model.DisplayText));
+            }
+            
             switch (model.Options.ContentsStatus)
             {
                 case ContentsStatus.Published:
@@ -92,6 +97,11 @@ namespace OrchardCore.Contents.Controllers
                 default:
                     query = query.With<ContentItemIndex>(x => x.Latest);
                     break;
+            }
+
+            if (typeId != "")
+            {
+                model.Id = typeId;
             }
 
             if (!string.IsNullOrEmpty(model.TypeName))
@@ -158,7 +168,10 @@ namespace OrchardCore.Contents.Controllers
             if (maxPagedCount > 0 && pager.PageSize > maxPagedCount)
                 pager.PageSize = maxPagedCount;
 
-            var pagerShape = (await New.Pager(pager)).TotalItemCount(maxPagedCount > 0 ? maxPagedCount : await query.CountAsync());
+            var routeData = new RouteData();
+            routeData.Values.Add("DisplayText", model.DisplayText);
+            
+            var pagerShape = (await New.Pager(pager)).TotalItemCount(maxPagedCount > 0 ? maxPagedCount : await query.CountAsync()).RouteData(routeData);
             var pageOfContentItems = await query.Skip(pager.GetStartIndex()).Take(pager.PageSize).ListAsync();
 
             var contentItemSummaries = new List<dynamic>();
@@ -171,7 +184,8 @@ namespace OrchardCore.Contents.Controllers
                 .ContentItems(contentItemSummaries)
                 .Pager(pagerShape)
                 .Options(model.Options)
-                .TypeDisplayName(model.TypeDisplayName ?? "");
+                .TypeDisplayName(model.TypeDisplayName ?? "")
+                .DisplayText(model.DisplayText ?? "");
 
             return View(viewModel);
         }
@@ -306,6 +320,9 @@ namespace OrchardCore.Contents.Controllers
 
             var contentItem = await _contentManager.NewAsync(id);
 
+            // Set the current user as the owner to check for ownership permissions on creation
+            contentItem.Owner = User.Identity.Name;
+
             if (!await _authorizationService.AuthorizeAsync(User, Permissions.EditContent, contentItem))
             {
                 return Unauthorized();
@@ -362,6 +379,9 @@ namespace OrchardCore.Contents.Controllers
         private async Task<IActionResult> CreatePOST(string id, string returnUrl, bool stayOnSamePage, Func<ContentItem, Task> conditionallyPublish)
         {
             var contentItem = await _contentManager.NewAsync(id);
+
+            // Set the current user as the owner to check for ownership permissions on creation
+            contentItem.Owner = User.Identity.Name;
 
             if (!await _authorizationService.AuthorizeAsync(User, Permissions.EditContent, contentItem))
             {

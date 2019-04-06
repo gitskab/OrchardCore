@@ -28,14 +28,9 @@ namespace OrchardCore.Environment.Shell
             return Task.FromResult(_extensionManager.GetFeatures().Where(f => _shellDescriptor.Features.Any(sf => sf.Id == f.Id)));
         }
 
-        public Task<IEnumerable<IFeatureInfo>> EnableFeaturesAsync(IEnumerable<IFeatureInfo> features)
+        public Task<IEnumerable<IFeatureInfo>> GetAlwaysEnabledFeaturesAsync()
         {
-            return _shellDescriptorFeaturesManager.EnableFeaturesAsync(_shellDescriptor, features);
-        }
-
-        public Task<IEnumerable<IFeatureInfo>> EnableFeaturesAsync(IEnumerable<IFeatureInfo> features, bool force)
-        {
-            return _shellDescriptorFeaturesManager.EnableFeaturesAsync(_shellDescriptor, features, force);
+            return Task.FromResult(_extensionManager.GetFeatures().Where(f => _shellDescriptor.Features.Any(sf => sf.Id == f.Id && sf.AlwaysEnabled)));
         }
 
         public Task<IEnumerable<IFeatureInfo>> GetDisabledFeaturesAsync()
@@ -43,14 +38,9 @@ namespace OrchardCore.Environment.Shell
             return Task.FromResult(_extensionManager.GetFeatures().Where(f => _shellDescriptor.Features.All(sf => sf.Id != f.Id)));
         }
 
-        public Task<IEnumerable<IFeatureInfo>> DisableFeaturesAsync(IEnumerable<IFeatureInfo> features)
+        public Task<(IEnumerable<IFeatureInfo>, IEnumerable<IFeatureInfo>)> UpdateFeaturesAsync(IEnumerable<IFeatureInfo> featuresToDisable, IEnumerable<IFeatureInfo> featuresToEnable, bool force)
         {
-            return _shellDescriptorFeaturesManager.DisableFeaturesAsync(_shellDescriptor, features);
-        }
-
-        public Task<IEnumerable<IFeatureInfo>> DisableFeaturesAsync(IEnumerable<IFeatureInfo> features, bool force)
-        {
-            return _shellDescriptorFeaturesManager.DisableFeaturesAsync(_shellDescriptor, features, force);
+            return _shellDescriptorFeaturesManager.UpdateFeaturesAsync(_shellDescriptor, featuresToDisable, featuresToEnable, force);
         }
 
         public Task<IEnumerable<IExtensionInfo>> GetEnabledExtensionsAsync()

@@ -11,11 +11,11 @@ namespace OrchardCore.Contents.Liquid
 {
     public class ContentItemFilter : ILiquidFilter
     {
-        public async Task<FluidValue> ProcessAsync(FluidValue input, FilterArguments arguments, TemplateContext ctx)
+        public async ValueTask<FluidValue> ProcessAsync(FluidValue input, FilterArguments arguments, TemplateContext ctx)
         {
             if (!ctx.AmbientValues.TryGetValue("Services", out var services))
             {
-                throw new ArgumentException("Services missing while invoking 'shape_build_display'");
+                throw new ArgumentException("Services missing while invoking 'content_item_id'");
             }
 
             var contentManager = ((IServiceProvider)services).GetRequiredService<IContentManager>();

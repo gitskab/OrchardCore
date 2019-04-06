@@ -1,19 +1,21 @@
-using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace OrchardCore.Environment.Shell
 {
     public class SingleShellSettingsManager : IShellSettingsManager
     {
-        public ShellSettings GetSettings(string name)
+        public ShellSettings CreateDefaultSettings()
         {
-            return LoadSettings().First();
+            return new ShellSettings()
+            {
+                Name = "Default",
+                State = Models.TenantState.Running
+            };
         }
 
         public IEnumerable<ShellSettings> LoadSettings()
         {
-            yield return new ShellSettings
+            yield return new ShellSettings()
             {
                 Name = "Default",
                 State = Models.TenantState.Running
@@ -22,12 +24,6 @@ namespace OrchardCore.Environment.Shell
 
         public void SaveSettings(ShellSettings shellSettings)
         {
-        }
-
-        public bool TryGetSettings(string name, out ShellSettings settings)
-        {
-            settings = LoadSettings().First();
-            return true;
         }
     }
 }
